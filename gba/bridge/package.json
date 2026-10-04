@@ -1,0 +1,18 @@
+{
+  "name": "smashandclash-gba-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Smash&Clash SDK bridge for the Game Boy Advance client: makes the ROM's SDK calls with @smashandclash/sdk.",
+  "type": "module",
+  "main": "bridge.mjs",
+  "scripts": {
+    "start": "node bridge.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@smashandclash/sdk": "^0.2.1"
+  },
+  "license": "MIT"
+}
