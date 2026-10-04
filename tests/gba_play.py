@@ -25,6 +25,8 @@ from libretro import JoypadState, Session, TempDirPathDriver, UnformattedLogDriv
 from libretro.drivers import ArrayAudioDriver, ArrayVideoDriver, DictOptionDriver, IterableInputDriver, StandardContentDriver
 from PIL import Image
 
+from recorder import Recorder, hold
+
 EWRAM = 0x02000000
 MAGIC = b'SNC-GBA-BRIDGE1'
 STATE = b'SNC-STATE: '
@@ -128,6 +130,7 @@ class Driver:
         self.queue = collections.deque()
         self.state, self.raw, self.addr, self.shots = {}, '', None, 0
         self._mem = None
+        self.rec = Recorder()
         self.clock = time.time()
         self.relay = Relay(*bridge)
         core = os.environ.get('MGBA_CORE') or os.path.expanduser('~/retro/blobs/mgba_libretro.so')
@@ -173,6 +176,7 @@ class Driver:
     def frames(self, n):
         for _ in range(n):
             self.session.run()
+            self.rec.frame(self.session)
             mem = self.mem()
             self.relay.step(mem)
             # while an SDK call is out, run at the GBA's own speed: its timeouts count frames
@@ -197,8 +201,9 @@ class Driver:
         return False
 
     def press(self, **buttons):
-        self.queue.extend([JoypadState(**buttons)] * 3 + [0] * 4)
-        self.frames(8)
+        h, rest = hold(3)
+        self.queue.extend([JoypadState(**buttons)] * h + [0] * (rest or 4))
+        self.frames(h + (rest or 4) + 1)
 
     def hits(self):
         out = []

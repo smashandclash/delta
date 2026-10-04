@@ -6,9 +6,11 @@
 
 Real games against real people and the house opponent, on smashandclash.in's servers. Same rules, same cards, same Game Review as [smashandclash.in](https://www.smashandclash.in).
 
-![Smash&Clash on the DS (in Delta) and the GBA](media/hero.png)
+[![Smash&Clash, now on retro consoles: watch the launch film](media/preview.gif)](https://github.com/smashandclash/delta/releases/download/v1.1.0/smashandclash-retro-consoles.mp4)
 
-**[⬇ Download the DS game, the GBA game and the Delta skins (v1.0.0)](https://github.com/smashandclash/delta/releases/latest)**
+**[▶ Watch the 52-second launch film (1080p MP4)](https://github.com/smashandclash/delta/releases/download/v1.1.0/smashandclash-retro-consoles.mp4)** · [Portrait cut (9:16)](https://github.com/smashandclash/delta/releases/download/v1.1.0/smashandclash-retro-consoles-portrait.mp4)
+
+**[⬇ Download the DS game, the GBA game and the Delta skins (v1.1.0)](https://github.com/smashandclash/delta/releases/latest)**
 
 **Build your own client today: [docs.smashandclash.in](https://docs.smashandclash.in)**
 
@@ -33,6 +35,7 @@ Looking for the PSP? It has its own repo, with a GPU-drawn 3D board: **[smashand
 - [Build it yourself](#build-it-yourself)
 - [Tests: real games, headless](#tests-real-games-headless)
 - [Build your own client](#build-your-own-client)
+- [The launch film](#the-launch-film)
 - [Troubleshooting](#troubleshooting)
 - [Links](#links)
 
@@ -74,6 +77,8 @@ The GBA has no network, so the GBA game reaches the game through the **SDK bridg
 The game's boot screen ticks off both steps and goes to the lobby as soon as the SDK is on the line. Your record (rating, rules, the game in progress) is kept in the cartridge's battery save. Delta cannot run the bridge (it has no scripting), so in Delta, play the DS game.
 
 ## Screenshots
+
+![Smash&Clash on the DS (in Delta) and the GBA](media/hero.png)
 
 | | |
 | :---: | :---: |
@@ -206,6 +211,12 @@ python3 tests/gba_play.py gba/smashandclash.gba build/gba-test
 ## Build your own client
 
 A DS cartridge is one surface. The same calls work for a Discord bot, a terminal, a game engine, a smartwatch or something nobody has thought of yet. **[docs/build-your-own-client.md](docs/build-your-own-client.md)** is the checklist: the state you get, move names, drawing the board from either seat, effects, hops and overruns, waiting, errors and rate limits, and fair play. Start at **[docs.smashandclash.in](https://docs.smashandclash.in)**.
+
+## The launch film
+
+One film for all three consoles, in a 16:9 and a 9:16 cut: [landscape](https://github.com/smashandclash/delta/releases/download/v1.1.0/smashandclash-retro-consoles.mp4) · [portrait](https://github.com/smashandclash/delta/releases/download/v1.1.0/smashandclash-retro-consoles-portrait.mp4).
+
+Everything on the consoles' screens is real gameplay. The frames come from the same headless emulator runs as [the tests](#tests-real-games-headless) (melonDS, mGBA through the SDK bridge, PPSSPP), recording live online games at a human pace (set `SNC_RECORD=DIR` on any test to record one yourself, see `tests/recorder.py`), and are put on 3D models of a DS, a GBA SP, a PSP and a phone running Delta. The score is the consoles' own soundtracks and effects from [The sound](#the-sound), cut on the bar. The film was made with [HyperFrames](https://github.com/heygen-com/hyperframes).
 
 ## Troubleshooting
 

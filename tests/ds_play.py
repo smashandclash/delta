@@ -19,8 +19,11 @@ import sys
 import time
 
 from libretro import JoypadState, Pointer, Session, TempDirPathDriver, UnformattedLogDriver
+from libretro.drivers.user import DefaultUserDriver
 from libretro.drivers import ArrayAudioDriver, ArrayVideoDriver, DictOptionDriver, IterableInputDriver, StandardContentDriver
 from PIL import Image
+
+from recorder import Recorder, hold
 
 # the DS layout (ds/source/view.c)
 TW, TH, BX, BY, GX, GY, HAND_Y, RX, RW = 32, 44, 5, 4, 2, 3, 147, 180, 72
@@ -44,7 +47,7 @@ def cell_xy(cell, seat):
 
 
 class Driver:
-    def __init__(self, rom, out, options):
+    def __init__(self, rom, out, options, name='Ada'):
         self.out = out
         os.makedirs(out, exist_ok=True)
         self.queue = collections.deque()
@@ -53,10 +56,12 @@ class Driver:
         self.state = {}
         self.lines = []
         self.shots = 0
+        self.rec = Recorder()
         core = os.environ.get('MELONDS_CORE') or os.path.expanduser('~/retro/blobs/melondsds_libretro-linux-x86_64-Release/cores/melondsds_libretro.so')
         self.session = Session(core=core, game=rom, content=StandardContentDriver(), audio=ArrayAudioDriver(),
                                input=IterableInputDriver(self.inputs()), video=ArrayVideoDriver(),
-                               options=DictOptionDriver(variables=options), path=TempDirPathDriver(core, 'libretro'), log=self.log)
+                               options=DictOptionDriver(variables=options), path=TempDirPathDriver(core, 'libretro'), log=self.log,
+                               user=DefaultUserDriver(username=name))
 
     def inputs(self):
         while True:
@@ -72,6 +77,7 @@ class Driver:
     def frames(self, n):
         for _ in range(n):
             self.session.run()
+            self.rec.frame(self.session)
             self.read_log()
 
     def read_log(self):
@@ -100,12 +106,14 @@ class Driver:
         return False
 
     def tap(self, x, y, frames=6):
-        self.queue.extend([touch(x, y)] * frames + [0] * 8)
-        self.frames(frames + 10)
+        h, rest = hold(frames)
+        self.queue.extend([touch(x, y)] * h + [0] * (rest or 8))
+        self.frames(h + (rest or 8) + 2)
 
     def press(self, **buttons):
-        self.queue.extend([JoypadState(**buttons)] * 6 + [0] * 8)
-        self.frames(16)
+        h, rest = hold(6)
+        self.queue.extend([JoypadState(**buttons)] * h + [0] * (rest or 8))
+        self.frames(h + (rest or 8) + 2)
 
     def shot(self, name):
         self.frames(8)  # let the frame drawn last make it to the screen
@@ -194,7 +202,7 @@ def main():
         'melonds_jit_enable': 'disabled',
         'melonds_show_cursor': 'disabled',
     }
-    with Driver(a.rom, a.out, options) as d:
+    with Driver(a.rom, a.out, options, a.name) as d:
         if not d.wait_for(lambda st: st.get('scr') == '0' and st.get('busy') == '0', 120):
             d.shot('boot-failed')
             print('FAIL: never reached the lobby')
