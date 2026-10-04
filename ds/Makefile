@@ -18,8 +18,9 @@ ifeq ($(wildcard build/assets/assets.h),)
     $(shell python3 ../tools/make_assets.py ds build/assets 1>&2)
 endif
 
-SOURCEDIRS	:= source ../core build/assets
-INCLUDEDIRS	:= source ../core build/assets
+# audio/: the music and effects (made by ../tools/audio/make_audio.py, committed)
+SOURCEDIRS	:= source ../core build/assets audio
+INCLUDEDIRS	:= source ../core build/assets audio
 
 ARM7ELF		:= $(BLOCKSDS)/sys/arm7/main_core/arm7_dswifi.elf
 

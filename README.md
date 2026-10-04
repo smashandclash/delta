@@ -27,6 +27,7 @@ Looking for the PSP? It has its own repo, with a GPU-drawn 3D board: **[smashand
 - [Play on the GBA in mGBA](#play-on-the-gba-in-mgba)
 - [Screenshots](#screenshots)
 - [How to play](#how-to-play)
+- [The sound](#the-sound)
 - [How it works](#how-it-works)
 - [The SDK, call by call](#the-sdk-call-by-call)
 - [Build it yourself](#build-it-yourself)
@@ -42,6 +43,7 @@ Looking for the PSP? It has its own repo, with a GPU-drawn 3D board: **[smashand
 | [`ds/`](ds) | **The Nintendo DS game** (C, [BlocksDS](https://blocksds.skylyrac.net)). Wi-Fi, TLS and the whole game on the touch screen; the top screen is a bonus. |
 | [`gba/`](gba) | **The Game Boy Advance game** (C, [Wonderful](https://wonderful.asie.pl) + libtonc). A retro take on the Arena Pop look: pixel fonts, hard edges, sprite cursor. |
 | [`gba/bridge/`](gba/bridge) | **The SDK bridge** the GBA plays through: an mGBA Lua script and a Node script on [`@smashandclash/sdk`](https://www.npmjs.com/package/@smashandclash/sdk). |
+| [`ds/audio/`](ds/audio), [`gba/audio/`](gba/audio) | **Each console's own soundtrack and effects**, encoded for its sound hardware ([`tools/audio/`](tools/audio) made them). |
 | [`skins/`](skins) | **Delta controller skins**: the DS touch screen alone, big, like a GBA SP (iPhone and iPad, portrait and landscape), and a matching GBA skin. |
 | [`core/`](core) | The shared C core: an HTTPS keep-alive client (mbedTLS), the SDK's calls in C, the client's state machine, D-pad navigation and a 16-bit software renderer. |
 | [`tools/`](tools) | Builds the art from the real game (cards, logo, fonts), the Delta skins, and the TLS root certificates. |
@@ -104,6 +106,18 @@ You are always blue and the other side orange, whichever seat you hold. **New ga
 | Look at a card up close | the top screen | **SELECT** |
 | Replay QR (after a game) | **SELECT** | **SELECT** |
 | Resign (press twice) | **START** | **START** |
+| Sound on or off (in the lobby) | **START** | **START** |
+
+## The sound
+
+Each console has its own original soundtrack and effects, made with [ElevenLabs](https://elevenlabs.io) for that console the way its screens are: a lobby theme, a game theme, a win and a lose jingle, and eight effects (the cursor, picking, backing out, a card landing, a capture, your turn, a "not allowed" and the game starting).
+
+| | DS | GBA |
+| --- | --- | --- |
+| **Sound** | bright handheld pop: marimba, glockenspiel, slap bass | pocket chiptune: pulse-wave leads, triangle bass, noise drums |
+| **Played by** | the DS's sound hardware: themes as IMA-ADPCM looping in hardware, effects as 8-bit PCM, 16384 Hz | DirectSound: 8-bit PCM at 13379 Hz fed by DMA, the theme on channel A and effects on B |
+
+The themes loop seamlessly: [`tools/audio/make_audio.py`](tools/audio/make_audio.py) cuts each one on the bar, a whole number of bars long, lined up by cross-correlation and crossfaded at the seam. What plays when is shared by every console ([`core/snc_sound.c`](core/snc_sound.c)): the lobby theme in menus and waiting rooms, the game theme in a game, a jingle at the end. The headless tests record the emulator's audio and check it against the themes, including that a theme loops. **START** in the lobby turns the sound off (and on again); the game remembers.
 
 ## How it works
 
@@ -174,7 +188,7 @@ python3 tools/make_deltaskin.py skins
 sh host/build.sh && ./build/host/gba_preview build/shots
 ```
 
-`tools/make_certs.mjs` refreshes the built-in root certificates (`core/snc_certs.h`) from `tools/roots.pem`.
+`tools/make_certs.mjs` refreshes the built-in root certificates (`core/snc_certs.h`) from `tools/roots.pem`. The sound is committed, ready to build (`ds/audio/`, `gba/audio/`); [`tools/audio/gen.mjs`](tools/audio/gen.mjs) holds the prompts it was made from (it needs an ElevenLabs API key to make new takes) and [`tools/audio/make_audio.py`](tools/audio/make_audio.py) encodes them (numpy and ffmpeg).
 
 ## Tests: real games, headless
 

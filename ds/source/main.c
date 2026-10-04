@@ -15,6 +15,7 @@
 #include "snc_client.h"
 #include "snc_draw.h"
 #include "snc_platform.h"
+#include "sound.h"
 #include "view.h"
 
 #define VERSION "1.0.0"
@@ -26,6 +27,7 @@
 static snc_client client;
 static snc_api api;
 static view_t view;
+static snc_sound sound;
 static uint16_t top_buf[256 * 192] __attribute__((aligned(32)));
 static uint16_t bot_buf[256 * 192] __attribute__((aligned(32)));
 static snc_surf top, bot;
@@ -135,35 +137,44 @@ static void connect_wifi(void) {
 
 /* ----------------------------------- input ------------------------------------ */
 
-static void handle_input(void) {
+// The buttons and the touch screen, and the sounds they make (a mask of SFX_*).
+static unsigned handle_input(void) {
 	uint32_t down = keysDown(), rep = keysDownRepeat();
+	unsigned fx = 0;
 	if (down & KEY_TOUCH) {
 		touchPosition t;
 		touchRead(&t);
 		int i = view_hit_at(&view, t.px, t.py);
 		view.show_focus = 0;
-		if (i >= 0) view_press(&view, &client, i);
+		if (i >= 0) view_press(&view, &client, i), fx |= 1u << SFX_SELECT;
 	}
 	if (client.screen == SC_RULES) {
 		if (rep & KEY_UP) view_scroll(&view, -2);
 		if (rep & KEY_DOWN) view_scroll(&view, 2);
 		if (rep & KEY_LEFT) view_scroll(&view, -10);
 		if (rep & KEY_RIGHT) view_scroll(&view, 10);
-		if (down & (KEY_A | KEY_B | KEY_X)) snc_act_back(&client);
-		return;
+		if (down & (KEY_A | KEY_B | KEY_X)) snc_act_back(&client), fx |= 1u << SFX_BACK;
+		return fx;
 	}
+	int before = view.focus_id * 256 + view.focus_arg;
 	if (rep & KEY_UP) view_nav(&view, 0, -1);
 	if (rep & KEY_DOWN) view_nav(&view, 0, 1);
 	if (rep & KEY_LEFT) view_nav(&view, -1, 0);
 	if (rep & KEY_RIGHT) view_nav(&view, 1, 0);
-	if (down & KEY_A) view_activate(&view, &client);
-	if (down & KEY_B) view_back(&view, &client);
-	if (down & KEY_L) view_step_hand(&view, &client, -1);  // step through your playable cards
-	if (down & KEY_R) view_step_hand(&view, &client, 1);
-	if (down & KEY_X) snc_act_how_to_play(&client);
-	if (down & KEY_Y) snc_act_action(&client);
-	if ((down & KEY_START) && client.screen == SC_GAME) snc_act_resign(&client);
-	if ((down & KEY_SELECT) && snc_client_over(&client)) view.show_replay = !view.show_replay;
+	if (view.focus_id * 256 + view.focus_arg != before) fx |= 1u << SFX_MOVE;
+	if (down & KEY_A) view_activate(&view, &client), fx |= 1u << SFX_SELECT;
+	if (down & KEY_B) view_back(&view, &client), fx |= 1u << SFX_BACK;
+	if (down & KEY_L) view_step_hand(&view, &client, -1), fx |= 1u << SFX_MOVE;  // step through your playable cards
+	if (down & KEY_R) view_step_hand(&view, &client, 1), fx |= 1u << SFX_MOVE;
+	if (down & KEY_X) snc_act_how_to_play(&client), fx |= 1u << SFX_SELECT;
+	if (down & KEY_Y) snc_act_action(&client), fx |= 1u << SFX_SELECT;
+	if (down & KEY_START) {
+		if (client.screen == SC_GAME && client.have_game) snc_act_resign(&client);
+		else if (client.screen == SC_LOBBY || client.screen == SC_GAME) snc_act_toggle_sound(&client);  // the lobby: sound on or off
+		fx |= 1u << SFX_SELECT;
+	}
+	if ((down & KEY_SELECT) && snc_client_over(&client)) view.show_replay = !view.show_replay, fx |= 1u << SFX_SELECT;
+	return fx;
 }
 
 // A cheap fingerprint of what the screens show, to redraw only when it changes.
@@ -221,6 +232,8 @@ int main(int argc, char **argv) {
 	record_load(record, sizeof record);
 	nickname(name, sizeof name);
 	snc_client_init(&client, name, "Nintendo DS", record);
+	ds_sound_init();
+	ds_sound_music(client.rec.sound ? MUS_LOBBY : MUS_NONE);  // the lobby's theme while the Wi-Fi comes up
 	view_init(&view);
 
 	if (!Wifi_InitDefault(INIT_ONLY | WIFI_ATTEMPT_DSI_MODE)) {
@@ -249,8 +262,12 @@ int main(int argc, char **argv) {
 		frames++;
 		scanKeys();
 		int input = keysDown() || keysDownRepeat();
-		handle_input();
+		unsigned fx = handle_input();
 		snc_client_tick(&client);
+		snc_music music;
+		fx |= snc_sound_update(&sound, &client, &music);
+		ds_sound_music(music);
+		if (client.rec.sound) ds_sound_sfx(fx);
 		if (client.rec_dirty) record_save();
 		uint32_t sig = signature();
 		int animating = client.busy[0] || (client.screen == SC_GAME && client.game.your_turn && snc_targets(&client.game, &client.pick));

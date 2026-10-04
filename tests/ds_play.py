@@ -121,6 +121,25 @@ def s(st, k, default='0'):
     return st.get(k, default)
 
 
+def save_audio(d, path):
+    """The session's sound as a WAV, and how much of it was sound at all."""
+    import wave
+    import numpy as np
+    buf = np.frombuffer(d.session.audio.buffer, dtype=np.int16)
+    info = d.session.audio.system_av_info
+    rate = int(round(info.timing.sample_rate)) if info else 32768
+    with wave.open(path, 'wb') as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(buf.tobytes())
+    mono = buf.reshape(-1, 2).mean(axis=1) / 32768
+    secs = [mono[i:i + rate] for i in range(0, len(mono) - rate, rate)]
+    loud = [20 * np.log10(np.sqrt(np.mean(x * x)) + 1e-9) for x in secs]
+    quiet = sum(1 for v in loud if v < -50)
+    print(f'audio: {len(mono) / rate:.1f} s at {rate} Hz, median {np.median(loud):.1f} dB, {quiet} silent seconds -> {path}', flush=True)
+
+
 def play_turn(d):
     st = d.state
     seat = s(st, 'seat', 'A')
@@ -163,6 +182,7 @@ def main():
     ap.add_argument("--scenario", default="game", help="game (vs an opponent at your level) | code (vs a second client) | lobby")
     ap.add_argument("--joiner", default="build/host/api_test", help="the second client for --scenario code")
     ap.add_argument("--name", default="Ada", help="the console nickname (the player name)")
+    ap.add_argument("--linger", type=float, default=0, help="--scenario lobby: seconds to stay in the lobby (with its music)")
     a = ap.parse_args()
     options = {
         'melonds_console_mode': 'ds',
@@ -181,6 +201,8 @@ def main():
             sys.exit(1)
         d.shot('lobby')
         if a.scenario == 'lobby':
+            d.frames(int(a.linger * 60))  # past the end of the lobby's theme: it must loop
+            save_audio(d, os.path.join(a.out, 'session.wav'))
             return
         other = None
         if a.scenario == 'code':
@@ -223,6 +245,7 @@ def main():
         if other:
             other.wait(timeout=60)
             print('joiner:', open(os.path.join(a.out, 'joiner.log')).read().strip().splitlines()[-2:])
+        save_audio(d, os.path.join(a.out, 'session.wav'))
         print('PASS' if last.get('over') == '1' else 'FAIL')
 
 

@@ -251,7 +251,7 @@ static void draw_top_rules(view_t *v, snc_surf *s, const snc_client *c) {
 	sg_wrap(s, &font_small, 14, 39 + font_body.line, SW - 28, font_small.line + 1,
 	        "Tap a card in your hand, then a green tile. An effect that needs a target lights its tiles the same way (Recruit! takes two: "
 	        "the card, then where it goes). Flip! and Swap!: tap the card again. A hop: tap a green tile, or Stay.\n"
-	        "With buttons: the D-pad moves, A picks, B puts a card back, X shows these rules, START resigns, SELECT shows the replay QR "
+	        "With buttons: the D-pad moves, A picks, B puts a card back, X shows these rules, START resigns (in the lobby: sound on or off), SELECT shows the replay QR "
 	        "after a game.",
 	        C_SUGAR, 11);
 }

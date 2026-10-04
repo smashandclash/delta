@@ -21,13 +21,13 @@ ifeq ($(wildcard $(ASSETS)/assets.h),)
 endif
 
 # The shared core, minus the HTTPS client: the SDK bridge makes the calls.
-CORE		:= snc_json.c snc_api.c snc_game.c snc_client.c snc_gfx.c snc_draw.c snc_ui.c snc_cards.c qrcodegen.c
+CORE		:= snc_json.c snc_api.c snc_game.c snc_client.c snc_gfx.c snc_draw.c snc_ui.c snc_cards.c snc_sound.c qrcodegen.c
 SOURCES		:= $(wildcard source/*.c) $(CORE) assets_data.c
-VPATH		:= source ../core $(ASSETS)
+VPATH		:= source ../core $(ASSETS) audio
 
 DEFINES		:= -DSNC_GBA -DSNC_BRIDGE -DSNC_BUF_CAP=16384 -DSNC_MAX_TOKS=1500
 LIBDIRS		:= $(WF_EXTLIB_DIR)/libtonc
-INCLUDES	:= -Isource -I../core -I$(ASSETS) $(foreach path,$(LIBDIRS),-isystem $(path)/include)
+INCLUDES	:= -Isource -I../core -I$(ASSETS) -Iaudio $(foreach path,$(LIBDIRS),-isystem $(path)/include)
 
 CFLAGS		+= -std=gnu11 -O2 -mthumb -Wall -Wno-format-truncation -ffunction-sections -fdata-sections \
 		   $(DEFINES) $(WF_ARCH_CFLAGS) $(INCLUDES)
@@ -35,7 +35,7 @@ CFLAGS		+= -std=gnu11 -O2 -mthumb -Wall -Wno-format-truncation -ffunction-sectio
 LDFLAGS		:= $(foreach path,$(LIBDIRS),-L$(path)/lib) -Wl,-Map,$(BUILDDIR)/$(NAME).map -Wl,--gc-sections \
 		   -Wl,--defsym=__heap_start=__eheap_start -Wl,--defsym=__heap_end=__eheap_end $(WF_ARCH_LDFLAGS) -ltonc -lgba
 
-OBJS		:= $(addprefix $(BUILDDIR)/obj/,$(notdir $(SOURCES:.c=.o)) assets_bin.o)
+OBJS		:= $(addprefix $(BUILDDIR)/obj/,$(notdir $(SOURCES:.c=.o)) assets_bin.o audio.o)
 
 .PHONY: all clean usage
 
@@ -56,6 +56,11 @@ $(BUILDDIR)/obj/snc_gfx.o: snc_gfx.c | $(BUILDDIR)/obj
 	@$(OBJCOPY) --rename-section .text=.iwram.snc_gfx $@
 
 $(BUILDDIR)/obj/assets_bin.o: $(ASSETS)/assets_bin.s | $(BUILDDIR)/obj
+	@echo "  AS      $<"
+	@$(CC) -x assembler-with-cpp $(WF_ARCH_CFLAGS) -c -o $@ $<
+
+# the music and effects (made by tools/audio/make_audio.py, committed in audio/)
+$(BUILDDIR)/obj/audio.o: audio/audio.s $(wildcard audio/*.bin) | $(BUILDDIR)/obj
 	@echo "  AS      $<"
 	@$(CC) -x assembler-with-cpp $(WF_ARCH_CFLAGS) -c -o $@ $<
 

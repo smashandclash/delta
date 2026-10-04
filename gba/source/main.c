@@ -16,6 +16,7 @@
 #include "snc_client.h"
 #include "snc_draw.h"
 #include "snc_platform.h"
+#include "sound.h"
 #include "view.h"
 
 #define VERSION "1.0.0"
@@ -28,6 +29,7 @@ EWRAM_BSS_ATTR static snc_api api;
 EWRAM_BSS_ATTR static view_t view;
 EWRAM_BSS_ATTR static char state_line[1200];  // "SNC-STATE: ..." for automated tests (they read RAM)
 static snc_surf scr;
+static snc_sound sound;
 static OBJ_ATTR obj_buffer[8];
 static int frame_ready;
 static uint32_t frames, last_sig;
@@ -210,6 +212,7 @@ static void vblank_isr(void) {
 	keys_new |= cur & ~keys_held;
 	keys_held = cur;
 	vbl_count++;
+	gba_sound_vblank();
 }
 
 static void read_keys(void) {
@@ -231,32 +234,42 @@ static void read_keys(void) {
 #define key_hit(k) (hit & (k))
 #define key_repeat(k) (rep & (k))
 
-static void handle_input(void) {
+// The buttons, and the sounds they make (a mask of SFX_*).
+static unsigned handle_input(void) {
+	unsigned fx = 0;
 	if (ui.inspect) {
-		if (key_hit(KEY_B | KEY_A | KEY_SELECT)) view_toggle_inspect(&view, &client);
-		return;
+		if (key_hit(KEY_B | KEY_A | KEY_SELECT)) view_toggle_inspect(&view, &client), fx |= 1u << SFX_BACK;
+		return fx;
 	}
 	if (client.screen == SC_RULES) {
 		if (key_repeat(KEY_UP)) view_scroll(&view, -2);
 		if (key_repeat(KEY_DOWN)) view_scroll(&view, 2);
 		if (key_repeat(KEY_LEFT | KEY_L)) view_scroll(&view, -10);
 		if (key_repeat(KEY_RIGHT | KEY_R)) view_scroll(&view, 10);
-		if (key_hit(KEY_A | KEY_B)) snc_act_back(&client);
-		return;
+		if (key_hit(KEY_A | KEY_B)) snc_act_back(&client), fx |= 1u << SFX_BACK;
+		return fx;
 	}
+	int before = view.focus_id * 256 + view.focus_arg;
 	if (key_repeat(KEY_UP)) view_nav(&view, 0, -1);
 	if (key_repeat(KEY_DOWN)) view_nav(&view, 0, 1);
 	if (key_repeat(KEY_LEFT)) view_nav(&view, -1, 0);
 	if (key_repeat(KEY_RIGHT)) view_nav(&view, 1, 0);
-	if (key_hit(KEY_A)) view_activate(&view, &client);
-	if (key_hit(KEY_B)) view_back(&view, &client);
-	if (key_hit(KEY_L)) view_step_hand(&view, &client, -1);  // step through your playable cards
-	if (key_hit(KEY_R)) view_step_hand(&view, &client, 1);
-	if (key_hit(KEY_START) && client.screen == SC_GAME) snc_act_resign(&client);
+	if (view.focus_id * 256 + view.focus_arg != before) fx |= 1u << SFX_MOVE;
+	if (key_hit(KEY_A)) view_activate(&view, &client), fx |= 1u << SFX_SELECT;
+	if (key_hit(KEY_B)) view_back(&view, &client), fx |= 1u << SFX_BACK;
+	if (key_hit(KEY_L)) view_step_hand(&view, &client, -1), fx |= 1u << SFX_MOVE;  // step through your playable cards
+	if (key_hit(KEY_R)) view_step_hand(&view, &client, 1), fx |= 1u << SFX_MOVE;
+	if (key_hit(KEY_START)) {
+		if (client.screen == SC_GAME && client.have_game) snc_act_resign(&client);
+		else if (client.screen == SC_LOBBY || client.screen == SC_GAME) snc_act_toggle_sound(&client);  // the lobby: sound on or off
+		fx |= 1u << SFX_SELECT;
+	}
 	if (key_hit(KEY_SELECT)) {
 		if (snc_client_over(&client)) view.show_replay = !view.show_replay;
 		else view_toggle_inspect(&view, &client);
+		fx |= 1u << SFX_SELECT;
 	}
+	return fx;
 }
 
 /* ----------------------------------- frames ----------------------------------- */
@@ -277,8 +290,12 @@ void gba_bridge_frame(void) {
 	vblank();
 	if (booting) return;
 	read_keys();
-	handle_input();
+	unsigned fx = handle_input();
 	snc_client_tick(&client);
+	snc_music music;
+	fx |= snc_sound_update(&sound, &client, &music);
+	gba_sound_music(music);
+	if (client.rec.sound) gba_sound_sfx(fx);
 	if (client.rec_dirty) record_save();
 	uint32_t sig = signature();
 	if (sig != last_sig) {
@@ -327,6 +344,7 @@ int main(void) {
 	REG_WAITCNT = 0x4317;  // SRAM 8 cycles, ROM 3/1 with the prefetch on
 	irq_init(NULL);
 	irq_add(II_VBLANK, vblank_isr);
+	gba_sound_init();
 	REG_TM2CNT = 0;
 	REG_TM3CNT = 0;
 	REG_TM2D = 0;
@@ -347,6 +365,7 @@ int main(void) {
 	snc_client_init(&client, "GBA player", "Game Boy Advance", record);
 	view_init(&view);
 	snc_api_init(&api, "smashandclash-gba/" VERSION, "smashandclash-c/" VERSION " (gba)");
+	gba_sound_music(client.rec.sound ? MUS_LOBBY : MUS_NONE);  // the lobby's theme while the bridge comes up
 
 	boot();
 	booting = 0;

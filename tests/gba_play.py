@@ -248,6 +248,25 @@ class Driver:
         print('shot', path, flush=True)
 
 
+def save_audio(d, path):
+    """The session's sound as a WAV, and how much of it was sound at all."""
+    import wave
+    import numpy as np
+    buf = np.frombuffer(d.session.audio.buffer, dtype=np.int16)
+    info = d.session.audio.system_av_info
+    rate = int(round(info.timing.sample_rate)) if info else 32768
+    with wave.open(path, 'wb') as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(buf.tobytes())
+    mono = buf.reshape(-1, 2).mean(axis=1) / 32768
+    secs = [mono[i:i + rate] for i in range(0, len(mono) - rate, rate)]
+    loud = [20 * np.log10(np.sqrt(np.mean(x * x)) + 1e-9) for x in secs]
+    quiet = sum(1 for v in loud if v < -50)
+    print(f'audio: {len(mono) / rate:.1f} s at {rate} Hz, median {np.median(loud):.1f} dB, {quiet} silent seconds -> {path}', flush=True)
+
+
 def play_turn(d):
     st = d.state
     if st.get('hop') == '1':
@@ -279,6 +298,7 @@ def main():
     ap.add_argument('out')
     ap.add_argument('--turns', type=int, default=40)
     ap.add_argument('--bridge', default='127.0.0.1:8765')
+    ap.add_argument('--linger', type=float, default=0, help='stay in the lobby this many seconds (with its music), then stop')
     a = ap.parse_args()
     host, port = a.bridge.split(':')
     with Driver(a.rom, a.out, (host, int(port))) as d:
@@ -289,6 +309,11 @@ def main():
             print('FAIL: never reached the lobby')
             os._exit(1)
         d.shot('lobby')
+        if a.linger:  # past the end of the lobby's theme: it must loop
+            d.frames(int(a.linger * 60))
+            save_audio(d, os.path.join(a.out, 'session.wav'))
+            print('PASS', flush=True)
+            os._exit(0)
         d.choose(H_NEW)
         if not d.wait_for(lambda st: st.get('have') == '1' and st.get('st') != '0' and (st.get('turn') == '1' or st.get('over') == '1'), 90):
             d.shot('no-game')
@@ -317,6 +342,7 @@ def main():
         d.shot('game-over')
         last = d.state
         print('RESULT:', last.get('main'), '| score', last.get('score'), '| moves', last.get('moves'), '| rating', last.get('rating'))
+        save_audio(d, os.path.join(a.out, 'session.wav'))
         print('PASS' if last.get('over') == '1' else 'FAIL', flush=True)
     os._exit(0)
 

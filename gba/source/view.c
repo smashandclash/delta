@@ -581,7 +581,7 @@ static void draw_rules(view_t *v, snc_surf *s, const snc_client *c) {
 	static const char HOW[] =
 		"On the Game Boy Advance\n"
 		"D-pad: move. A: pick a card, then a green tile. B: put the card back. L / R: your next playable card. "
-		"SELECT: look at a card up close (after a game: the replay's QR code). START: resign.\n"
+		"SELECT: look at a card up close (after a game: the replay's QR code). START: resign (in the lobby: sound on or off).\n"
 		"An effect that needs a target lights its tiles the same way (Recruit! takes two: the card, then where it goes). "
 		"Flip! and Swap!: pick the card again. A hop: pick a green tile, or Stay.\n\n";
 	int lh = 10, w = SW - 20;
