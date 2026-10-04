@@ -18,7 +18,8 @@ import { SmashAndClash, SmashAndClashError } from '@smashandclash/sdk';
 
 const PORT = Number(process.env.SNC_BRIDGE_PORT || 8765);
 const HOST = process.env.SNC_BRIDGE_HOST || '127.0.0.1';
-const sc = new SmashAndClash(process.env.SNC_BASE_URL ? { baseUrl: process.env.SNC_BASE_URL } : {});
+// `client` names this app to the API (SDK 0.2.2+), after the SDK's own name in the X-SDK header
+const sc = new SmashAndClash({ client: 'smashandclash-gba-bridge/1.0.0', ...(process.env.SNC_BASE_URL ? { baseUrl: process.env.SNC_BASE_URL } : {}) });
 const games = new Map(); // game id -> the SDK's Game (it holds your seat's token)
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);

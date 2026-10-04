@@ -12,7 +12,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@smashandclash/sdk": "^0.2.1"
+    "@smashandclash/sdk": "^0.2.2"
   },
   "license": "MIT"
 }
